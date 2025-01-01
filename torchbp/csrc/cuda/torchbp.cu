@@ -259,7 +259,7 @@ __global__ void entropy_grad_kernel(
     }
 }
 
-template<typename T>
+template<typename T, bool bistatic>
 __global__ void backprojection_polar_2d_kernel(
           const T* data,
           const float* pos,
@@ -303,14 +303,19 @@ __global__ void backprojection_polar_2d_kernel(
         float py = (y - pos_y);
         float pz2 = pos_z * pos_z;
 
-        float tx_dx = sinf(att[idbatch * nsweeps * 3 + i * 3 + 2]) * ant_tx_dy;
-        float tx_dy = cosf(att[idbatch * nsweeps * 3 + i * 3 + 2]) * ant_tx_dy;
-
         // Calculate distance to the pixel.
+        float d;
+        if constexpr (bistatic) {
+            float tx_dx = sinf(att[idbatch * nsweeps * 3 + i * 3 + 2]) * ant_tx_dy;
+            float tx_dy = cosf(att[idbatch * nsweeps * 3 + i * 3 + 2]) * ant_tx_dy;
 
-        float drx = sqrtf(px * px + py * py + pz2);
-        float dtx = sqrt((px - tx_dx) * (px - tx_dx) + (py - tx_dy) * (py - tx_dy) + pz2);
-        float d = drx + dtx - d0;
+            float drx = sqrtf(px * px + py * py + pz2);
+            float dtx = sqrt((px - tx_dx) * (px - tx_dx) + (py - tx_dy) * (py - tx_dy) + pz2);
+            d = drx + dtx - d0;
+        } else {
+            float drx = sqrtf(px * px + py * py + pz2);
+            d = 2.0f * drx - d0;
+        }
 
         float sx = delta_r * d;
 
@@ -993,39 +998,74 @@ at::Tensor backprojection_polar_2d_cuda(
 
 	if (data.dtype() == at::kComplexFloat) {
         const c10::complex<float>* data_ptr = data_contig.data_ptr<c10::complex<float>>();
-        backprojection_polar_2d_kernel<complex64_t>
-              <<<block_count, thread_per_block>>>(
-                      (complex64_t*)data_ptr,
-                      pos_ptr,
-                      vel_ptr,
-                      att_ptr,
-                      (complex64_t*)img_ptr,
-                      sweep_samples,
-                      nsweeps,
-                      ref_phase,
-                      delta_r,
-                      r0, dr,
-                      theta0, dtheta,
-                      Nr, Ntheta,
-                      d0, ant_tx_dy);
+        if (ant_tx_dy != 0.0f) {
+            backprojection_polar_2d_kernel<complex64_t, true>
+                  <<<block_count, thread_per_block>>>(
+                          (complex64_t*)data_ptr,
+                          pos_ptr,
+                          vel_ptr,
+                          att_ptr,
+                          (complex64_t*)img_ptr,
+                          sweep_samples,
+                          nsweeps,
+                          ref_phase,
+                          delta_r,
+                          r0, dr,
+                          theta0, dtheta,
+                          Nr, Ntheta,
+                          d0, ant_tx_dy);
+        } else {
+            backprojection_polar_2d_kernel<complex64_t, false>
+                  <<<block_count, thread_per_block>>>(
+                          (complex64_t*)data_ptr,
+                          pos_ptr,
+                          vel_ptr,
+                          att_ptr,
+                          (complex64_t*)img_ptr,
+                          sweep_samples,
+                          nsweeps,
+                          ref_phase,
+                          delta_r,
+                          r0, dr,
+                          theta0, dtheta,
+                          Nr, Ntheta,
+                          d0, ant_tx_dy);
+        }
     } else if (data.dtype() == at::kComplexHalf) {
         const c10::complex<at::Half>* data_ptr = data_contig.data_ptr<c10::complex<at::Half>>();
-        backprojection_polar_2d_kernel<half2>
-              <<<block_count, thread_per_block>>>(
-                      (half2*)data_ptr,
-                      pos_ptr,
-                      vel_ptr,
-                      att_ptr,
-                      (complex64_t*)img_ptr,
-                      sweep_samples,
-                      nsweeps,
-                      ref_phase,
-                      delta_r,
-                      r0, dr,
-                      theta0, dtheta,
-                      Nr, Ntheta,
-                      d0, ant_tx_dy);
-
+        if (ant_tx_dy != 0.0f) {
+            backprojection_polar_2d_kernel<half2, true>
+                  <<<block_count, thread_per_block>>>(
+                          (half2*)data_ptr,
+                          pos_ptr,
+                          vel_ptr,
+                          att_ptr,
+                          (complex64_t*)img_ptr,
+                          sweep_samples,
+                          nsweeps,
+                          ref_phase,
+                          delta_r,
+                          r0, dr,
+                          theta0, dtheta,
+                          Nr, Ntheta,
+                          d0, ant_tx_dy);
+        } else {
+            backprojection_polar_2d_kernel<half2, false>
+                  <<<block_count, thread_per_block>>>(
+                          (half2*)data_ptr,
+                          pos_ptr,
+                          vel_ptr,
+                          att_ptr,
+                          (complex64_t*)img_ptr,
+                          sweep_samples,
+                          nsweeps,
+                          ref_phase,
+                          delta_r,
+                          r0, dr,
+                          theta0, dtheta,
+                          Nr, Ntheta,
+                          d0, ant_tx_dy);
+        }
     }
 	return img;
 }

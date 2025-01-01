@@ -21,7 +21,8 @@ grid_polar = {"r": (10, 500), "theta": (-1, 1), "nr": nr, "ntheta": ntheta}
 
 data = torch.randn((nbatch, nsweeps, nsamples), dtype=data_dtype, device=device)
 
-pos = torch.randn((nbatch, nsweeps, 3), dtype=torch.float32, device=device)
+pos = torch.zeros((nbatch, nsweeps, 3), dtype=torch.float32, device=device)
+pos[:,:,1] = 0.25 * 3e8/fc * (torch.arange(nsweeps, dtype=torch.float32, device=device) - nsweeps/2)
 vel = torch.zeros((nbatch, nsweeps, 3), dtype=torch.float32, device=device)
 att = torch.zeros((nbatch, nsweeps, 3), dtype=torch.float32, device=device)
 

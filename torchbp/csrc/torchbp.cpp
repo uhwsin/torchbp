@@ -44,7 +44,7 @@ static void sincospi(T x, T *sinx, T *cosx) {
 }
 
 template <typename T>
-void polar_interp_kernel_linear_cpu(const c10::complex<T> *img, c10::complex<T> *out, const T *dorigin, T rotation,
+static void polar_interp_kernel_linear_cpu(const c10::complex<T> *img, c10::complex<T> *out, const T *dorigin, T rotation,
                   T ref_phase, T r0, T dr, T theta0, T dtheta, int Nr, int Ntheta,
                   T r1, T dr1, T theta1, T dtheta1, int Nr1, int Ntheta1, int idx, int idbatch) {
     const int idtheta = idx % Ntheta1;
@@ -90,7 +90,7 @@ void polar_interp_kernel_linear_cpu(const c10::complex<T> *img, c10::complex<T> 
 }
 
 template <typename T>
-void polar_interp_kernel_linear_grad_cpu(const c10::complex<T> *img, const T *dorigin, T rotation,
+static void polar_interp_kernel_linear_grad_cpu(const c10::complex<T> *img, const T *dorigin, T rotation,
                   T ref_phase, T r0, T dr, T theta0, T dtheta, int Nr, int Ntheta,
                   T r1, T dr1, T theta1, T dtheta1, int Nr1, int Ntheta1,
                   const c10::complex<T> *grad, c10::complex<T> *img_grad, T *dorigin_grad,
@@ -345,7 +345,7 @@ std::vector<at::Tensor> polar_interp_linear_grad_cpu(
 	return ret;
 }
 
-void backprojection_polar_2d_kernel_cpu(
+static void backprojection_polar_2d_kernel_cpu(
           const complex64_t* data,
           const float* pos,
           const float* vel,
@@ -467,8 +467,8 @@ at::Tensor backprojection_polar_2d_cpu(
     d0 *= 2.0f;
 
 #pragma omp parallel for collapse(2)
-    for(int idx = 0; idx < Nr * Ntheta; idx++) {
-        for(int idbatch = 0; idbatch < nbatch; idbatch++) {
+    for(int idbatch = 0; idbatch < nbatch; idbatch++) {
+        for(int idx = 0; idx < Nr * Ntheta; idx++) {
             backprojection_polar_2d_kernel_cpu(
                           data_ptr,
                           pos_ptr,
@@ -489,7 +489,7 @@ at::Tensor backprojection_polar_2d_cpu(
 	return img;
 }
 
-void backprojection_polar_2d_grad_kernel_cpu(
+static void backprojection_polar_2d_grad_kernel_cpu(
           const complex64_t* data,
           const float* pos,
           const float* vel,
@@ -712,7 +712,7 @@ std::vector<at::Tensor> backprojection_polar_2d_grad_cpu(
 }
 
 template<typename T>
-void polar_to_cart_kernel_linear_cpu(const T *img, T
+static void polar_to_cart_kernel_linear_cpu(const T *img, T
         *out, const float *dorigin, float rotation, float ref_phase, float r0,
         float dr, float theta0, float dtheta, int Nr, int Ntheta, float x0,
         float dx, float y0, float dy, int Nx, int Ny, int polar_interp,

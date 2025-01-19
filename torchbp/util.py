@@ -1,8 +1,9 @@
 import torch
 from torch import Tensor
 from math import pi
+import numpy as np
 
-def diff(x, dim=-1, same_size=False):
+def diff(x: Tensor, dim: int=-1, same_size: bool=False):
     """
     ``np.diff`` implemented in torch.
 
@@ -27,7 +28,7 @@ def diff(x, dim=-1, same_size=False):
     else:
         return x[...,1:]-x[...,:-1]
 
-def unwrap(phi, dim=-1):
+def unwrap(phi: Tensor, dim: int=-1):
     """
     ``np.unwrap`` implemented in torch.
 
@@ -130,9 +131,27 @@ def fft_peak_1d(x: Tensor, dim: int=-1, fractional: bool=True):
         a = l - a
     return a
 
+def detrend(x: Tensor):
+    """
+    Removes linear trend
+
+    Parameters
+    ----------
+    x : Tensor
+        Input tensor. Should be 1 dimensional.
+    Returns
+    ----------
+    x : Tensor
+        x with linear trend removed.
+    """
+    n = x.shape[0]
+    k = np.arange(n) / n
+    a, b = np.polyfit(k, x.cpu().numpy(), 1)
+    return x - a*torch.arange(n, device=x.device)/n + b
+
 def entropy(x: Tensor):
     """
-    Calculates entropy of:
+    Calculates entropy:
 
     ``-sum(y*log(y))``
 
@@ -152,7 +171,30 @@ def entropy(x: Tensor):
     ax /= torch.sum(ax)
     return -torch.sum(torch.xlogy(ax, ax))
 
-def shift_spectrum(x: Tensor, dim=-1):
+def contrast(x: Tensor, dim: int=-1):
+    """
+    Calculates negative contrast:
+
+    ``-mean(std/mu)``
+
+    where ``mu`` is mean and ``std`` is standard deviation of ``abs(x)`` along
+    dimension ``dim``.
+
+    Parameters
+    ----------
+    x : Tensor
+        Input tensor.
+
+    Returns
+    ----------
+    contrast: Tensor
+        Calculated negative contrast of the input.
+    """
+    std, mu = torch.std_mean(torch.abs(x), dim=dim)
+    contrast = torch.mean(std / mu)
+    return -contrast
+
+def shift_spectrum(x: Tensor, dim: int=-1):
     """
     Equivalent to: ``fft(ifftshift(ifft(x, dim), dim), dim)``,
     but avoids calculating FFTs.
@@ -223,7 +265,7 @@ def generate_fmcw_data(target_pos: Tensor, target_rcs: Tensor, pos : Tensor, fc:
         data += (target_rcs[e]/d**4) * torch.exp(-1j*2*pi*(fc*tau - k*tau*t + 0.5*k*tau**2))
     return data
 
-def make_polar_grid(r0: float, r1: float, nr: int, ntheta: int, theta_limit: int=1):
+def make_polar_grid(r0: float, r1: float, nr: int, ntheta: int, theta_limit: int=1, squint: float=0):
     """
     Generate polar grid dict in format understood by other polar functions.
 
@@ -241,11 +283,15 @@ def make_polar_grid(r0: float, r1: float, nr: int, ntheta: int, theta_limit: int
         Theta axis limits, symmetrical around zero.
         Units are sin of angle (0 to 1 valid range).
         Default is 1.
+    squint : float
+        Grid azimuth mean angle, radians.
 
     Returns
     ----------
     grid_polar : dict
         Polar grid dict.
     """
-    grid_polar = {"r": (r0, r1), "theta": (-theta_limit, theta_limit), "nr": nr, "ntheta": ntheta}
+    t0 = np.clip(np.sin(squint) - theta_limit, -1, 1)
+    t1 = np.clip(np.sin(squint) + theta_limit, -1, 1)
+    grid_polar = {"r": (r0, r1), "theta": (t0, t1), "nr": nr, "ntheta": ntheta}
     return grid_polar

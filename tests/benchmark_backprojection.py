@@ -10,7 +10,7 @@ device = "cuda"
 nbatch = 1
 nr = 1024
 ntheta = 1024
-nsweeps = 1024
+nsweeps = 16 if device == "cpu" else 1024
 nsamples = 1024
 data_dtype = torch.complex64
 

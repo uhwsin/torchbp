@@ -27,7 +27,7 @@ def get_extensions():
     else:
         print("No cuda support")
 
-    extra_link_args = []
+    extra_link_args = ["-fopenmp"]
     extra_compile_args = {
         "cxx": [
             "-O3" if not debug_mode else "-O0",
@@ -72,7 +72,7 @@ setup(
     version="0.0.1",
     packages=find_packages(),
     ext_modules=get_extensions(),
-    install_requires=["torch"],
+    install_requires=["torch", "numpy"],
     extras_require = {
         'docs':  [
             "matplotlib >=3.5",

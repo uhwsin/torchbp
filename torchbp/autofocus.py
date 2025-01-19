@@ -3,7 +3,7 @@ import numpy as np
 from torch import Tensor
 from .ops import backprojection_polar_2d, backprojection_cart_2d
 from .ops import entropy
-from .util import quad_interp, fft_peak_1d, unwrap
+from .util import quad_interp, fft_peak_1d, unwrap, detrend
 import inspect
 
 def pga_pd(img, window_width=None, max_iters=10, window_exp=0.5, min_window=5, remove_trend=True, offload=False):
@@ -69,6 +69,8 @@ def pga_pd(img, window_width=None, max_iters=10, window_exp=0.5, min_window=5, r
         # Weighted sum over range
         phidot = torch.sum((torch.conj(g) * gdot).imag, axis=0) / torch.sum(torch.abs(g)**2, axis=0)
         phi = torch.cumsum(phidot, dim=0)
+        if remove_trend:
+            phi = detrend(unwrap(phi))
         phi_sum += phi
 
         del phidot
@@ -79,13 +81,6 @@ def pga_pd(img, window_width=None, max_iters=10, window_exp=0.5, min_window=5, r
         img_ifft = torch.fft.fft(img, axis=-1)
         img_ifft *= torch.exp(-1j*phi[None, :])
         img = torch.fft.ifft(img_ifft, axis=-1)
-
-    if remove_trend:
-        s = fft_peak_1d(torch.exp(1j*phi_sum), fractional=False)
-        linear = 2*torch.pi*torch.arange(ntheta, device=phi_sum.device) * s / ntheta
-        phi_sum += linear
-        phi_sum = unwrap(torch.angle(torch.exp(1j*phi_sum)))
-        img = torch.roll(img, -int(round(s.item())), dims=-1)
 
     return img, phi_sum
 
@@ -150,6 +145,8 @@ def pga_ml(img, window_width=None, max_iters=10, window_exp=0.5, min_window=5, r
         g = torch.fft.fft(g, axis=-1)
         u,s,v = torch.linalg.svd(g)
         phi = torch.angle(v[0,:])
+        if remove_trend:
+            phi = detrend(unwrap(phi))
         phi_sum += phi
 
         del g
@@ -158,13 +155,6 @@ def pga_ml(img, window_width=None, max_iters=10, window_exp=0.5, min_window=5, r
         img_ifft = torch.fft.fft(img, axis=-1)
         img_ifft *= torch.exp(-1j*phi[None, :])
         img = torch.fft.ifft(img_ifft, axis=-1)
-
-    if remove_trend:
-        s = fft_peak_1d(torch.exp(1j*phi_sum), fractional=False)
-        linear = 2*torch.pi*torch.arange(ntheta, device=phi_sum.device) * s / ntheta
-        phi_sum += linear
-        phi_sum = unwrap(torch.angle(torch.exp(1j*phi_sum)))
-        img = torch.roll(img, -int(round(s.item())), dims=-1)
 
     return img, phi_sum
 
@@ -312,8 +302,10 @@ def minimum_entropy_autofocus(f, data: Tensor, data_time: Tensor, pos: Tensor, v
                     vopt.grad /= wa[:, None]
                     g = vopt.grad.detach()
                     gpos = torch.cumsum(l*g* dt, 0)
-                    dp = torch.linalg.vector_norm(gpos, dim=-1)
+                    dp = torch.abs(gpos[:,0])
                     maxd = torch.quantile(dp, grad_limit_quantile)
+                    dp = torch.linalg.vector_norm(gpos, dim=-1)
+                    maxd2 = torch.quantile(dp, grad_limit_quantile)
                     s = max_step_limit * wl / (1e-5 + maxd)
                     if maxd < convergence_limit * wl:
                         if verbose:

@@ -6,23 +6,24 @@ Only Nvidia GPUs are supported. Currently, some operations are not supported on 
 
 On RTX 3090 Ti backprojection on polar grid achieves 225 billion backprojections/s.
 
-## Documentation
-
-...
-
 ## Installation
-
-### Using pip
-
-```bash
-pip install torchbp
-```
 
 ### From source
 
 ```bash
-git clone ...
-cd ...
-# Editable install
-pip install -e .
+git clone https://github.com/Ttl/torchbp.git
+cd torchbp
+pip install .
 ```
+
+## Documentation
+
+API documentation and examples can be built with sphinx.
+
+```bash
+pip install .[docs]
+cd docs
+make html
+```
+
+Open `docs/build/html/index.html`.
